@@ -1,0 +1,43 @@
+name: Launch cron
+
+# Déclenche les tâches périodiques de l'API AETHER (serverless sur Vercel, sans boucle de fond).
+# - /cron/minute   : rappels de lancement (24 h, 1 h, 10 min) et récaps Nemoria en attente.
+# - /cron/imminent : rafraîchit les lancements des prochaines 48 h (toutes les 15 min).
+# La sync complète quotidienne est déclenchée par Vercel Cron (vercel.json d'AETHER-back).
+# GitHub ne garantit pas l'horaire exact (retards de quelques minutes possibles) :
+# les rappels sont à seuil, un passage en retard les envoie quand même.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: launch-cron
+  cancel-in-progress: false
+
+env:
+  API_URL: https://aether-api-three.vercel.app
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Tâches minute (rappels, récaps)
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: curl -fsS --max-time 120 -H "Authorization: Bearer $CRON_SECRET" "$API_URL/cron/minute"
+
+      - name: Sync des lancements imminents (toutes les 15 min)
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          minute=$(date -u +%M)
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ $((10#$minute % 15)) -ge 5 ]; then
+            echo "Pas de sync imminente à la minute $minute"; exit 0
+          fi
+          curl -fsS --max-time 290 -o /dev/null -w "HTTP %{http_code}\n" \
+            -H "Authorization: Bearer $CRON_SECRET" "$API_URL/cron/imminent"
