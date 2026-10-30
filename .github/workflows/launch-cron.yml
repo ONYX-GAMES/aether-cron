@@ -29,7 +29,8 @@ jobs:
       - name: Tâches minute (rappels, récaps)
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: curl -fsS --max-time 120 -H "Authorization: Bearer $CRON_SECRET" "$API_URL/cron/minute"
+        run: |
+          curl -fsS --max-time 120 -H "Authorization: Bearer $CRON_SECRET" "$API_URL/cron/minute"
 
       - name: Sync des lancements imminents (toutes les 15 min)
         env:
